@@ -1,0 +1,663 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Any Angle Mockup: put any image in 3D, shoot it with a real lens and depth of field, export PNG.">
+<meta name="theme-color" content="#ECEDEF">
+<title>Any Angle Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: desktop = control rail (right) + viewfinder; mobile = viewfinder + bottom sheet with tabs */
+:root{
+  --bg:#ECEDEF;--panel:#F7F7F8;--ink:#16181D;--muted:#626873;--line:#D5D8DD;
+  --accent:#0F7B6C;--accent-ink:#fff;--stage:#E1E3E7;--chip:#E7E9EC;--check-a:#E6E7EA;--check-b:#F3F4F6;
+  --font-ui:"Vazirmatn",Tahoma,"Segoe UI",sans-serif;--font-num:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:light}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#111316;--panel:#181B1F;--ink:#ECEEF1;--muted:#969CA6;--line:#2A2F35;
+  --accent:#3DB7A3;--accent-ink:#06130F;--stage:#1D2024;--chip:#22262B;--check-a:#22252A;--check-b:#2B2F35;color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--ink)}
+body{font-family:var(--font-ui);font-size:14px;line-height:1.6;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+button{font:inherit;color:inherit}
+
+.app{height:100%;display:grid;grid-template-columns:340px minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);
+  grid-template-areas:"bar bar" "panel stage";
+  padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
+.bar{grid-area:bar;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line)}
+.bar h1{margin:0;font-size:18px;font-weight:800;letter-spacing:-.01em;direction:ltr}
+.bar .acts{display:flex;gap:8px}
+.btn{border:0;border-radius:10px;padding:9px 14px;cursor:pointer;background:var(--accent);color:var(--accent-ink);font-weight:700;min-height:40px}
+.btn.ghost{background:var(--chip);color:var(--ink);border:1px solid var(--line);font-weight:500}
+.btn:disabled{opacity:.6;cursor:progress}
+.btn:focus-visible,.chip:focus-visible,.tab:focus-visible,.sw:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.panel{grid-area:panel;display:flex;flex-direction:column;min-height:0;border-left:1px solid var(--line);background:var(--panel)}
+.handle{display:none}
+.tabs{display:flex;gap:2px;padding:8px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+.tab{flex:1 0 auto;border:0;background:transparent;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:13px;color:var(--muted);min-height:36px}
+.tab[aria-selected="true"]{background:var(--ink);color:var(--bg)}
+.panes{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+.pane{padding:14px 16px 24px;display:flex;flex-direction:column;gap:12px}
+.pane h2{margin:6px 0 -4px;font-size:12px;font-weight:700;color:var(--muted)}
+.hint{font-size:12px;color:var(--muted);margin:0}
+
+.row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{border:1px solid var(--line);background:var(--chip);font-size:13px;padding:5px 12px;border-radius:999px;cursor:pointer;min-height:34px}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip:disabled{opacity:.4;cursor:not-allowed}
+.chip.num{font-family:var(--font-num);font-size:12px;direction:ltr}
+
+.sw{width:32px;height:32px;border-radius:50%;border:1px solid var(--line);cursor:pointer;padding:0;position:relative}
+.sw[aria-pressed="true"]::after{content:"";position:absolute;inset:-5px;border-radius:50%;border:2px solid var(--accent)}
+.colorpick{width:32px;height:32px;border:1px solid var(--line);border-radius:50%;padding:0;background:none;cursor:pointer;overflow:hidden}
+.colorpick::-webkit-color-swatch-wrapper{padding:0}.colorpick::-webkit-color-swatch{border:0;border-radius:50%}
+
+.slider{display:grid;grid-template-columns:auto 1fr;gap:0 8px;align-items:center}
+.slider label{font-size:13px}
+.slider output{justify-self:end;font-family:var(--font-num);font-size:12px;color:var(--muted);direction:ltr;font-variant-numeric:tabular-nums}
+.slider input{grid-column:1/-1;width:100%;direction:ltr;accent-color:var(--accent);height:28px;margin:0}
+.group{display:flex;flex-direction:column;gap:12px}
+.group.off{opacity:.4;pointer-events:none}
+
+.switch{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px;font-weight:500;cursor:pointer;min-height:36px}
+.switch input{appearance:none;width:42px;height:24px;border-radius:12px;background:var(--line);position:relative;cursor:pointer;flex:none;margin:0;transition:background .2s}
+.switch input::after{content:"";position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:right .2s;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.switch input:checked{background:var(--accent)}
+.switch input:checked::after{right:21px}
+.switch input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.corner{display:flex;gap:12px;align-items:center}
+.corner svg{width:60px;height:60px;flex:none}
+.corner svg path{fill:var(--chip);stroke:var(--ink);stroke-width:1.5}
+.corner svg .ref{fill:none;stroke:var(--muted);stroke-dasharray:3 3;stroke-width:1}
+
+.upload{border:1.5px dashed var(--line);border-radius:12px;padding:12px;display:flex;gap:12px;align-items:center;cursor:pointer;background:transparent;text-align:right;width:100%}
+.upload:hover,.upload.over{border-color:var(--accent)}
+.upload img{width:44px;height:60px;border-radius:6px;object-fit:contain;background:var(--chip);flex:none}
+.upload b{display:block}.upload small{color:var(--muted);font-size:12px}
+.dims{font-family:var(--font-num);font-size:12px;color:var(--muted)}
+
+.stage-area{grid-area:stage;position:relative;min-height:0;min-width:0;display:flex;align-items:center;justify-content:center;padding:16px}
+.stage{position:relative;border-radius:14px;overflow:hidden;background:var(--stage);touch-action:none;max-width:100%;max-height:100%}
+.stage.trans{background:repeating-conic-gradient(var(--check-a) 0 25%,var(--check-b) 0 50%) 50%/22px 22px!important}
+.stage canvas{position:absolute;inset:0;width:100%!important;height:100%!important;display:block}
+.hud{position:absolute;inset:auto 10px 10px 10px;display:flex;justify-content:space-between;align-items:flex-end;gap:8px;pointer-events:none}
+.hud>*{pointer-events:auto}
+.pill{white-space:nowrap;background:rgba(20,22,26,.62);color:#fff;border-radius:999px;padding:4px 10px;font-size:11px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.pill.num{font-family:var(--font-num);direction:ltr}
+.hud button.pill{border:0;cursor:pointer;min-height:32px;font-size:12px}
+.focus-dot{position:absolute;width:28px;height:28px;margin:-14px 0 0 -14px;border:1.5px solid #fff;border-radius:4px;box-shadow:0 0 0 1px rgba(0,0,0,.35);pointer-events:none;opacity:0;transition:opacity .4s}
+.focus-dot.show{opacity:1}
+.err{padding:24px;text-align:center;color:var(--muted)}
+
+@media (max-width:820px){
+  .app{display:flex;flex-direction:column}
+  .bar{padding:8px 12px}
+  .bar h1{font-size:16px}
+  .bar .btn{padding:7px 12px;min-height:36px;font-size:13px}
+  .stage-area{flex:1;padding:10px}
+  .panel{order:2;border-left:0;border-top:1px solid var(--line);border-radius:16px 16px 0 0;box-shadow:0 -6px 24px rgba(0,0,0,.08)}
+  .handle{display:block;align-self:center;width:100%;height:20px;border:0;background:transparent;cursor:pointer;position:relative}
+  .handle::before{content:"";position:absolute;left:50%;top:8px;width:40px;height:4px;margin-left:-20px;border-radius:2px;background:var(--line)}
+  .tabs{border-bottom:0;padding:0 8px 8px}
+  .panes{flex:none;max-height:44dvh;border-top:1px solid var(--line)}
+  .app:not(.sheet-open) .panes{display:none}
+  .chip{min-height:38px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app sheet-open" id="app">
+  <header class="bar">
+    <h1>Any Angle Mockup</h1>
+    <div class="acts">
+      <button class="btn ghost" id="uploadTop" type="button">آپلود تصویر</button>
+      <button class="btn" id="exportTop" type="button">خروجی PNG</button>
+    </div>
+  </header>
+
+  <aside class="panel" aria-label="تنظیمات">
+    <button class="handle" id="handle" type="button" aria-label="باز و بسته کردن پنل"></button>
+    <nav class="tabs" role="tablist">
+      <button class="tab" role="tab" data-t="img" aria-selected="true">تصویر</button>
+      <button class="tab" role="tab" data-t="shape" aria-selected="false">گوشه‌ها</button>
+      <button class="tab" role="tab" data-t="angle" aria-selected="false">زاویه</button>
+      <button class="tab" role="tab" data-t="lens" aria-selected="false">لنز</button>
+      <button class="tab" role="tab" data-t="light" aria-selected="false">نور</button>
+      <button class="tab" role="tab" data-t="out" aria-selected="false">خروجی</button>
+    </nav>
+    <div class="panes">
+      <section class="pane" id="p-img">
+        <button class="upload" id="drop" type="button">
+          <img id="thumb" alt="">
+          <span><b>تصویرت رو انتخاب کن</b><small>یا بکشش روی صفحه، یا Ctrl+V. هر نسبتی قبوله</small></span>
+        </button>
+        <input type="file" id="fileImg" accept="image/*" hidden>
+        <h2>ابعاد</h2>
+        <div class="row" id="shapes"></div>
+        <div class="row">
+          <button class="chip" id="fitCover" aria-pressed="true" type="button">پر کردن</button>
+          <button class="chip" id="fitContain" aria-pressed="false" type="button">کامل دیده شود</button>
+        </div>
+        <div class="slider"><label for="bright">روشنایی تصویر</label><output id="brightOut"></output><input type="range" id="bright" min="0.3" max="1.4" step="0.01" value="1"></div>
+      </section>
+
+      <section class="pane" id="p-shape" hidden>
+        <label class="switch">گرد کردن گوشه‌ها<input type="checkbox" id="cornersOn" checked></label>
+        <div class="group" id="cornerGroup">
+          <div class="corner">
+            <svg viewBox="0 0 64 64" aria-hidden="true"><path class="ref" id="refPath"></path><path id="cornerPath"></path></svg>
+            <p class="hint">خط‌چین: گوشه‌ی گرد معمولی. خط پر: گوشه‌ی فعلی.</p>
+          </div>
+          <div class="row">
+            <button class="chip" id="iosPreset" type="button">iOS</button>
+            <button class="chip" id="roundPreset" type="button">گرد ساده</button>
+          </div>
+          <div class="slider"><label for="radius">شعاع گوشه</label><output id="radiusOut"></output><input type="range" id="radius" min="0" max="50" step="0.5" value="12"></div>
+          <div class="slider"><label for="smooth">iOS بودن گوشه (Smoothing)</label><output id="smoothOut"></output><input type="range" id="smooth" min="0" max="100" step="1" value="60"></div>
+        </div>
+      </section>
+
+      <section class="pane" id="p-angle" hidden>
+        <div class="row" id="presets"></div>
+        <div class="slider"><label for="rx">رو به بالا و پایین</label><output id="rxOut"></output><input type="range" id="rx" min="-90" max="90" step="1" value="0"></div>
+        <div class="slider"><label for="ry">به چپ و راست</label><output id="ryOut"></output><input type="range" id="ry" min="-180" max="180" step="1" value="0"></div>
+        <div class="slider"><label for="rz">کج شدن</label><output id="rzOut"></output><input type="range" id="rz" min="-90" max="90" step="1" value="0"></div>
+        <label class="switch">دنبال کردن موس<input type="checkbox" id="follow"></label>
+        <p class="hint">روی صفحه: یک انگشت یا کلیک و کشیدن برای چرخاندن دوربین، دو انگشت برای زوم و جابه‌جایی (روی دسکتاپ: اسکرول و راست‌کلیک).</p>
+      </section>
+
+      <section class="pane" id="p-lens" hidden>
+        <div class="slider"><label for="focal">فاصله‌ی کانونی</label><output id="focalOut"></output><input type="range" id="focal" min="12" max="300" step="1" value="50"></div>
+        <div class="row" id="lenses"></div>
+        <label class="switch">حفظ کادر هنگام تغییر لنز<input type="checkbox" id="dolly" checked></label>
+        <label class="switch">عمق میدان (DOF)<input type="checkbox" id="dofOn" checked></label>
+        <div class="group" id="dofGroup">
+          <div class="slider"><label for="fstop">دیافراگم</label><output id="fstopOut"></output><input type="range" id="fstop" min="0.7" max="32" step="0.1" value="5.6"></div>
+          <div class="row" id="fstops"></div>
+          <div class="slider"><label for="subject">اندازه‌ی واقعی سوژه</label><output id="subjectOut"></output><input type="range" id="subject" min="3" max="300" step="1" value="15"></div>
+          <div class="slider"><label for="foff">جابه‌جایی فوکوس</label><output id="foffOut"></output><input type="range" id="foff" min="-30" max="30" step="0.1" value="0"></div>
+          <div class="row"><button class="chip" id="focusCenter" type="button">فوکوس روی مرکز</button></div>
+          <p class="hint">روی هر نقطه‌ی تصویر بزن تا فوکوس همون‌جا بشینه. سوژه‌ی کوچیک‌تر یعنی عمق میدان کمتر.</p>
+        </div>
+      </section>
+
+      <section class="pane" id="p-light" hidden>
+        <label class="switch">نور<input type="checkbox" id="lightOn" checked></label>
+        <div class="group" id="lightGroup">
+          <div class="slider"><label for="lightI">شدت نور</label><output id="lightIOut"></output><input type="range" id="lightI" min="0" max="2" step="0.01" value="1"></div>
+          <div class="slider"><label for="lightAz">جهت نور</label><output id="lightAzOut"></output><input type="range" id="lightAz" min="-180" max="180" step="1" value="35"></div>
+          <div class="slider"><label for="lightEl">ارتفاع نور</label><output id="lightElOut"></output><input type="range" id="lightEl" min="-30" max="90" step="1" value="40"></div>
+        </div>
+        <label class="switch">رفلکشن<input type="checkbox" id="reflOn" checked></label>
+        <div class="group" id="reflGroup">
+          <div class="slider"><label for="reflI">شدت رفلکشن</label><output id="reflIOut"></output><input type="range" id="reflI" min="0" max="2" step="0.01" value="0.6"></div>
+          <div class="slider"><label for="gloss">مات بودن سطح</label><output id="glossOut"></output><input type="range" id="gloss" min="0" max="0.7" step="0.01" value="0.12"></div>
+        </div>
+        <p class="hint">با نور و رفلکشن خاموش، رنگ‌های تصویر دقیقاً همون‌طور که هست می‌مونه.</p>
+      </section>
+
+      <section class="pane" id="p-out" hidden>
+        <label class="switch">پس‌زمینه در خروجی<input type="checkbox" id="bgOn" checked></label>
+        <div class="group" id="bgGroup"><div class="row" id="bgs"></div></div>
+        <p class="hint">با خاموش بودن پس‌زمینه، PNG شفاف می‌گیری.</p>
+        <h2>نسبت تصویر</h2>
+        <div class="row" id="aspects"></div>
+        <h2>ابعاد</h2>
+        <div class="row" id="sizes"></div>
+        <h2>کیفیت رندر نهایی</h2>
+        <div class="row" id="quality"></div>
+        <label class="switch">نرم کردن لبه‌ها (Anti-alias)<input type="checkbox" id="aaOn" checked></label>
+        <label class="switch">پیش‌نمایش با وضوح بالا<input type="checkbox" id="hqOn"></label>
+        <div class="dims" id="dims"></div>
+        <button class="btn" id="render" type="button">رندر و دانلود PNG</button>
+      </section>
+    </div>
+  </aside>
+
+  <main class="stage-area" id="wrap">
+    <div class="stage" id="stage">
+      <div class="focus-dot" id="focusDot"></div>
+      <div class="hud">
+        <span class="pill" id="status">در حال آماده‌سازی…</span>
+        <span class="pill num" id="lensinfo"></span>
+        <button class="pill" id="resetCam" type="button">↺ دوربین</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/environments/RoomEnvironment.js"></script>
+<script>
+(function(){
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const fa=(n,d=0)=>Number(n).toLocaleString('fa-IR',{maximumFractionDigits:d,minimumFractionDigits:d});
+const app=$('#app'),stage=$('#stage'),wrap=$('#wrap'),statusEl=$('#status');
+const setStatus=t=>{statusEl.textContent=t;};
+const D2R=Math.PI/180;
+const sheetMQ=matchMedia('(max-width:820px)');
+const coarse=matchMedia('(pointer:coarse)').matches;
+if(!window.THREE){stage.style.width='100%';stage.style.height='240px';stage.innerHTML='<div class="err">کتابخانه‌ی سه‌بعدی بارگذاری نشد. اینترنت رو چک کن و صفحه رو دوباره باز کن.</div>';return;}
+
+/* ---------- state ---------- */
+const S={
+  img:null,shape:'image',fit:'cover',bright:1,
+  corners:true,radius:12,smooth:60,
+  rot:{x:-6,y:-28,z:3},follow:false,
+  focal:50,dolly:true,dof:true,fstop:5.6,subject:15,foff:0,focusLocal:new THREE.Vector3(),
+  light:true,lightI:1,lightAz:35,lightEl:40,
+  refl:true,reflI:.6,gloss:.12,
+  bgOn:true,bg:{type:'solid',a:'#E4E6EA'},
+  aspect:[4,5],long:2160,quality:128,aa:true,hq:!coarse
+};
+$('#hqOn').checked=S.hq;
+const L=15;
+let version=0;const bump=()=>{version++;};
+
+/* ---------- renderer ---------- */
+let renderer;
+try{renderer=new THREE.WebGLRenderer({antialias:false,alpha:true,premultipliedAlpha:true,powerPreference:'high-performance'});}
+catch(e){stage.style.width='100%';stage.style.height='240px';stage.innerHTML='<div class="err">مرورگرت WebGL رو پشتیبانی نمی‌کنه.</div>';return;}
+renderer.setClearColor(0x000000,0);
+stage.prepend(renderer.domElement);
+const RT_TYPE=renderer.capabilities.isWebGL2?THREE.HalfFloatType:THREE.UnsignedByteType;
+const maxAniso=renderer.capabilities.getMaxAnisotropy();
+
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(40,4/5,0.5,3000);
+camera.filmGauge=35;camera.position.set(0,2.4,34);
+const controls=new THREE.OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true;controls.dampingFactor=.12;controls.minDistance=3;controls.maxDistance=1200;
+controls.update();controls.saveState();
+controls.addEventListener('change',bump);
+
+const key=new THREE.DirectionalLight(0xffffff,1);scene.add(key);
+function placeLight(){const a=S.lightAz*D2R,e=S.lightEl*D2R;key.position.set(Math.sin(a)*Math.cos(e)*40,Math.sin(e)*40,Math.cos(a)*Math.cos(e)*40);}
+
+const pmrem=new THREE.PMREMGenerator(renderer);let envTex=null;
+function ensureEnv(){
+  if(S.refl&&!envTex&&THREE.RoomEnvironment)envTex=pmrem.fromScene(new THREE.RoomEnvironment(),0.04).texture;
+  sheenMat.envMap=S.refl?envTex:null;
+}
+
+/* ---------- image plane ---------- */
+const root=new THREE.Group();scene.add(root);
+// base: the image itself, lit only by the key light (no environment), so colors stay true
+const mat=new THREE.MeshStandardMaterial({transparent:true,side:THREE.DoubleSide,metalness:0,roughness:1,emissive:0xffffff});
+const plane=new THREE.Mesh(new THREE.PlaneGeometry(1,1),mat);root.add(plane);
+// sheen: a black glossy layer that only adds specular reflection on top
+const sheenMat=new THREE.MeshPhysicalMaterial({color:0x000000,metalness:0,roughness:.1,clearcoat:1,clearcoatRoughness:.1,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1});
+const sheen=new THREE.Mesh(plane.geometry,sheenMat);plane.add(sheen);
+let tex=null;
+function applyMat(){
+  const b=S.bright;
+  if(S.light){mat.color.setScalar(b*.55);mat.emissiveIntensity=b*.45;key.visible=true;key.intensity=S.lightI;}
+  else{mat.color.setScalar(0);mat.emissiveIntensity=b;key.visible=false;}
+  ensureEnv();
+  sheen.visible=S.refl;
+  sheenMat.roughness=Math.min(1,.05+S.gloss);sheenMat.clearcoatRoughness=S.gloss;
+  sheenMat.envMapIntensity=S.reflI*1.6;
+  mat.needsUpdate=true;sheenMat.needsUpdate=true;bump();
+}
+
+/* squircle: iOS-style continuous corner */
+function squirclePoints(w,h,r,s,seg=40){
+  const e=Math.min(r*(1+0.6*s),Math.min(w,h)/2),n=2+2.6*s,pts=[];
+  if(e<1e-4)return[[w/2,h/2],[-w/2,h/2],[-w/2,-h/2],[w/2,-h/2]];
+  [[w/2-e,h/2-e,0],[-w/2+e,h/2-e,1],[-w/2+e,-h/2+e,2],[w/2-e,-h/2+e,3]].forEach(([cx,cy,q])=>{
+    for(let i=0;i<=seg;i++){const t=(q+i/seg)*Math.PI/2,c=Math.cos(t),sn=Math.sin(t);
+      pts.push([cx+e*Math.sign(c)*Math.pow(Math.abs(c),2/n),cy+e*Math.sign(sn)*Math.pow(Math.abs(sn),2/n)]);}
+  });
+  return pts;
+}
+function planeSize(){
+  let a;
+  if(S.shape==='image'&&S.img)a=(S.img.naturalWidth||S.img.width)/(S.img.naturalHeight||S.img.height);
+  else a={image:4/5,iphone:1206/2622,square:1,'34':3/4,'43':4/3,'169':16/9,'916':9/16}[S.shape];
+  return a>=1?[L,L/a]:[L*a,L];
+}
+function buildTexture(){
+  if(!S.img)return;
+  const [pw,ph]=planeSize(),aspect=pw/ph;
+  const iw=S.img.naturalWidth||S.img.width,ih=S.img.naturalHeight||S.img.height;
+  const cap=Math.min(4096,renderer.capabilities.maxTextureSize);
+  const long=Math.min(cap,Math.max(iw,ih,1200));
+  const cw=aspect>=1?long:Math.round(long*aspect),ch=aspect>=1?Math.round(long/aspect):long;
+  const c=document.createElement('canvas');c.width=cw;c.height=ch;
+  const x=c.getContext('2d');
+  if(S.fit==='contain'&&S.shape!=='image'){x.fillStyle='#000';x.fillRect(0,0,cw,ch);}
+  const sc=(S.fit==='cover'||S.shape==='image')?Math.max(cw/iw,ch/ih):Math.min(cw/iw,ch/ih);
+  x.imageSmoothingQuality='high';x.drawImage(S.img,(cw-iw*sc)/2,(ch-ih*sc)/2,iw*sc,ih*sc);
+  if(S.corners&&S.radius>0){
+    const pts=squirclePoints(cw,ch,Math.min(cw,ch)*S.radius/100,S.smooth/100,64);
+    x.globalCompositeOperation='destination-in';x.beginPath();
+    pts.forEach(([px,py],i)=>{i?x.lineTo(px+cw/2,ch/2-py):x.moveTo(px+cw/2,ch/2-py);});
+    x.closePath();x.fill();x.globalCompositeOperation='source-over';
+  }
+  if(tex)tex.dispose();
+  tex=new THREE.CanvasTexture(c);tex.encoding=THREE.sRGBEncoding;tex.anisotropy=maxAniso;
+  mat.map=tex;mat.emissiveMap=tex;mat.needsUpdate=true;sheenMat.map=tex;sheenMat.needsUpdate=true;
+  plane.scale.set(pw,ph,1);drawCorner();bump();
+}
+let texQ=false;const queueTexture=()=>{if(texQ)return;texQ=true;requestAnimationFrame(()=>{texQ=false;buildTexture();});};
+
+function setImage(img){
+  S.img=img;S.focusLocal.set(0,0,0);
+  $('#thumb').src=img.toDataURL?img.toDataURL('image/jpeg',.6):img.src;
+  buildTexture();
+}
+function loadImageFile(file){
+  if(!file||!file.type.startsWith('image/')){setStatus('فقط فایل تصویر (PNG، JPG، WebP) قبوله');return;}
+  const im=new Image();
+  im.onload=()=>{setImage(im);setStatus('تصویر جایگذاری شد');if(sheetMQ.matches)openTab('angle');};
+  im.onerror=()=>setStatus('این فایل تصویر قابل خوندن نیست');
+  im.src=URL.createObjectURL(file);
+}
+async function sampleImage(){
+  try{await document.fonts.load('800 90px Vazirmatn');}catch(e){}
+  const c=document.createElement('canvas');c.width=1200;c.height=1500;const x=c.getContext('2d');
+  const g=x.createLinearGradient(0,0,1200,1500);g.addColorStop(0,'#0F7B6C');g.addColorStop(1,'#1B2A4A');
+  x.fillStyle=g;x.fillRect(0,0,1200,1500);
+  for(let i=0;i<9;i++){x.beginPath();x.arc(220+(i%3)*380,280+Math.floor(i/3)*300,130-i*7,0,Math.PI*2);x.fillStyle=`hsla(${150+i*16},65%,${58+i*2}%,.9)`;x.fill();}
+  x.textAlign='center';x.fillStyle='#fff';x.font='800 120px Vazirmatn, sans-serif';x.fillText('Any Angle',600,1210);
+  x.font='500 46px Vazirmatn, sans-serif';x.fillStyle='rgba(255,255,255,.82)';x.direction='rtl';x.fillText('تصویر خودت رو آپلود کن',600,1300);
+  setImage(c);
+}
+
+function drawCorner(){
+  const r=200*S.radius/100,seg=48;
+  const pts=squirclePoints(200,200,r,S.smooth/100,seg).slice(0,seg+1);
+  const X=v=>(4+v*0.6).toFixed(2),Y=v=>(62-v*0.6).toFixed(2);
+  let d='M4,62 L64,62 ';pts.forEach(p=>{d+='L'+X(p[0])+','+Y(p[1])+' ';});d+='L4,2 Z';
+  $('#cornerPath').setAttribute('d',d);
+  const rp=Math.min(r,100)*0.6;
+  $('#refPath').setAttribute('d',`M4,2 L${(64-rp).toFixed(2)},2 A${rp.toFixed(2)},${rp.toFixed(2)} 0 0 1 64,${(2+rp).toFixed(2)} L64,62`);
+}
+
+/* ---------- progressive thin-lens renderer ----------
+   Each sample moves the camera to a point on the lens aperture and shears the frustum
+   so the focus plane stays fixed (real thin-lens DOF). Samples average in a float buffer. */
+const quadCam=new THREE.OrthographicCamera(-1,1,1,-1,0,1),quadGeo=new THREE.PlaneGeometry(2,2);
+const VS='varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position.xy,0.,1.);}';
+const accMat=new THREE.ShaderMaterial({uniforms:{tNew:{value:null},tPrev:{value:null},w:{value:1}},vertexShader:VS,
+  fragmentShader:'uniform sampler2D tNew,tPrev;uniform float w;varying vec2 vUv;void main(){gl_FragColor=mix(texture2D(tPrev,vUv),texture2D(tNew,vUv),w);}',depthTest:false,depthWrite:false});
+const outMat=new THREE.ShaderMaterial({uniforms:{tAcc:{value:null}},vertexShader:VS,
+  fragmentShader:`uniform sampler2D tAcc;varying vec2 vUv;
+  vec3 toSRGB(vec3 c){c=clamp(c,0.,1.);return mix(c*12.92,1.055*pow(c,vec3(1./2.4))-.055,step(.0031308,c));}
+  void main(){vec4 c=texture2D(tAcc,vUv);vec3 rgb=c.a>.0001?c.rgb/c.a:vec3(0.);gl_FragColor=vec4(toSRGB(rgb)*c.a,c.a);}`,depthTest:false,depthWrite:false});
+const accScene=new THREE.Scene(),outScene=new THREE.Scene();
+accScene.add(new THREE.Mesh(quadGeo,accMat));outScene.add(new THREE.Mesh(quadGeo,outMat));
+function makeTargets(w,h){
+  const o=d=>({type:RT_TYPE,depthBuffer:d});
+  return{w,h,sample:new THREE.WebGLRenderTarget(w,h,o(true)),a:new THREE.WebGLRenderTarget(w,h,o(false)),b:new THREE.WebGLRenderTarget(w,h,o(false)),n:0,last:null};
+}
+function disposeTargets(t){if(t){t.sample.dispose();t.a.dispose();t.b.dispose();}}
+const halton=(i,b)=>{let f=1,r=0;while(i>0){f/=b;r+=f*(i%b);i=Math.floor(i/b);}return r;};
+const sampleCam=new THREE.PerspectiveCamera();
+const vR=new THREE.Vector3(),vU=new THREE.Vector3(),vF=new THREE.Vector3(),vT=new THREE.Vector3();
+function focusDistance(){
+  root.updateMatrixWorld();
+  const wp=root.localToWorld(vT.copy(S.focusLocal));camera.getWorldDirection(vF);
+  return Math.max(1,wp.sub(camera.position).dot(vF)+S.foff*(15/S.subject));
+}
+const apertureRadius=()=>S.dof?(S.focal/(2*S.fstop))/10*(15/S.subject):0;
+function renderSample(t,i,aspect,jitter){
+  const A=apertureRadius();let lx=0,ly=0;
+  if(A>0){const rr=Math.sqrt(halton(i+1,2)),th=halton(i+1,3)*Math.PI*2;lx=rr*Math.cos(th)*A;ly=rr*Math.sin(th)*A;}
+  const px=jitter&&i>0?halton(i+1,5)-.5:0,py=jitter&&i>0?halton(i+1,7)-.5:0;
+  const fd=focusDistance();
+  camera.updateMatrixWorld();
+  vR.setFromMatrixColumn(camera.matrixWorld,0);vU.setFromMatrixColumn(camera.matrixWorld,1);
+  sampleCam.position.copy(camera.position).addScaledVector(vR,lx).addScaledVector(vU,ly);
+  sampleCam.quaternion.copy(camera.quaternion);sampleCam.updateMatrixWorld();
+  const n=camera.near,top=n*Math.tan(camera.fov*D2R/2),hh=2*top,ww=aspect*hh;
+  const sx=-lx*n/fd+px*ww/t.w,sy=-ly*n/fd+py*hh/t.h;
+  sampleCam.projectionMatrix.makePerspective(-ww/2+sx,ww/2+sx,top+sy,-top+sy,n,camera.far);
+  sampleCam.projectionMatrixInverse.copy(sampleCam.projectionMatrix).invert();
+  renderer.setRenderTarget(t.sample);renderer.clear();renderer.render(scene,sampleCam);
+  const prev=t.n%2?t.b:t.a,next=t.n%2?t.a:t.b;
+  accMat.uniforms.tNew.value=t.sample.texture;accMat.uniforms.tPrev.value=prev.texture;accMat.uniforms.w.value=1/(t.n+1);
+  renderer.setRenderTarget(next);renderer.render(accScene,quadCam);
+  t.n++;t.last=next;
+}
+function present(t){outMat.uniforms.tAcc.value=t.last.texture;renderer.setRenderTarget(null);renderer.clear();renderer.render(outScene,quadCam);}
+
+/* ---------- layout ---------- */
+let view=null;
+const outDims=()=>{const a=S.aspect[0]/S.aspect[1];return S.aspect[0]>=S.aspect[1]?[S.long,Math.round(S.long/a)]:[Math.round(S.long*a),S.long];};
+function layout(){
+  const a=S.aspect[0]/S.aspect[1],cs=getComputedStyle(wrap);
+  const aw=wrap.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
+  const ah=wrap.clientHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom);
+  if(aw<10||ah<10)return;
+  const w=Math.floor(Math.min(aw,ah*a)),h=Math.floor(w/a);
+  stage.style.width=w+'px';stage.style.height=h+'px';
+  const pr=S.hq?Math.min(window.devicePixelRatio||1,2):1;
+  renderer.setPixelRatio(pr);renderer.setSize(w,h,false);
+  camera.aspect=a;camera.setFocalLength(S.focal);camera.updateProjectionMatrix();
+  const bw=Math.round(w*pr),bh=Math.round(h*pr);
+  if(!view||view.w!==bw||view.h!==bh){disposeTargets(view);view=makeTargets(bw,bh);}
+  const o=outDims();$('#dims').textContent=o[0]+' × '+o[1]+' px · '+(S.dof?S.quality:Math.min(S.quality,16))+' samples';
+  bump();
+}
+new ResizeObserver(layout).observe(wrap);
+
+/* ---------- lens ---------- */
+function setFocal(f,dolly){
+  const old=S.focal;S.focal=f;
+  if(dolly&&S.dolly&&old>0){
+    const d=vT.copy(camera.position).sub(controls.target).multiplyScalar(f/old);
+    camera.position.copy(controls.target).add(d.setLength(Math.min(controls.maxDistance,Math.max(controls.minDistance,d.length()))));
+  }
+  camera.setFocalLength(f);camera.updateProjectionMatrix();lensInfo();bump();
+}
+function lensInfo(){$('#lensinfo').textContent=S.focal+'mm'+(S.dof?' · f/'+S.fstop.toFixed(1):'');}
+function resetCamera(){controls.reset();const f=S.focal;S.focal=50;setFocal(f,true);}
+
+/* ---------- loop ---------- */
+const mouse={x:0,y:0};
+stage.addEventListener('pointermove',e=>{if(!S.follow||e.pointerType==='touch')return;const r=stage.getBoundingClientRect();mouse.x=(e.clientX-r.left)/r.width*2-1;mouse.y=(e.clientY-r.top)/r.height*2-1;bump();});
+stage.addEventListener('pointerleave',()=>{mouse.x=0;mouse.y=0;if(S.follow)bump();});
+function targetRot(){let x=S.rot.x*D2R,y=S.rot.y*D2R,z=S.rot.z*D2R;if(S.follow){x+=mouse.y*.32;y+=mouse.x*.5;}return{x,y,z};}
+let seen=-1,exporting=false;
+const previewMax=()=>S.dof&&apertureRadius()>1e-4?(coarse?28:56):(S.aa?6:1);
+function tick(){
+  requestAnimationFrame(tick);
+  if(exporting||!view||!S.img)return;
+  controls.update();
+  const t=targetRot();let moving=false;
+  ['x','y','z'].forEach(a=>{const d=t[a]-root.rotation[a];if(Math.abs(d)>1e-4){root.rotation[a]+=d*.16;moving=true;}else root.rotation[a]=t[a];});
+  if(moving)bump();
+  if(version!==seen){seen=version;view.n=0;}
+  const max=previewMax();if(view.n>=max)return;
+  const t0=performance.now(),budget=coarse?10:14;
+  do{renderSample(view,view.n,camera.aspect,S.aa);}while(view.n<max&&!moving&&performance.now()-t0<budget);
+  present(view);
+  if(!busy)setStatus(view.n>=max?'آماده':'پالایش '+Math.round(view.n/max*100)+'%');
+}
+let busy=false;
+
+/* ---------- tap to focus ---------- */
+const ray=new THREE.Raycaster(),ndc=new THREE.Vector2();let downAt=null;
+renderer.domElement.addEventListener('pointerdown',e=>{downAt=[e.clientX,e.clientY,performance.now()];});
+renderer.domElement.addEventListener('pointerup',e=>{
+  if(!downAt||!S.dof)return;
+  if(Math.hypot(e.clientX-downAt[0],e.clientY-downAt[1])>6||performance.now()-downAt[2]>400)return;
+  const r=renderer.domElement.getBoundingClientRect();
+  ndc.set((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height*2-1));
+  ray.setFromCamera(ndc,camera);
+  const hit=ray.intersectObject(plane,false)[0];if(!hit)return;
+  S.focusLocal.copy(root.worldToLocal(hit.point.clone()));setFoff(0);
+  const dot=$('#focusDot');dot.style.left=(e.clientX-r.left)+'px';dot.style.top=(e.clientY-r.top)+'px';
+  dot.classList.add('show');clearTimeout(dot._t);dot._t=setTimeout(()=>dot.classList.remove('show'),900);
+  bump();
+});
+
+/* ---------- export ---------- */
+function drawBg(ctx,w,h){
+  if(!S.bgOn)return;const bg=S.bg;
+  if(bg.type==='grad'){const g=ctx.createLinearGradient(0,0,0,h);g.addColorStop(0,bg.a);g.addColorStop(1,bg.b);ctx.fillStyle=g;}else ctx.fillStyle=bg.a;
+  ctx.fillRect(0,0,w,h);
+}
+async function saveBlob(blob,name){
+  try{if(window.claude&&typeof claude.use==='function'){const d=await claude.use('downloads');if(d){await d.save({filename:name,data:blob});return;}}}catch(e){if(e&&e.code==='declined')return;}
+  const url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),4000);
+}
+async function doRender(){
+  if(exporting||!S.img)return;
+  const btns=[$('#render'),$('#exportTop')];btns.forEach(b=>b.disabled=true);exporting=true;busy=true;
+  const [w,h]=outDims();
+  const t=targetRot();root.rotation.set(t.x,t.y,t.z);
+  const sc=Math.min(1,renderer.capabilities.maxTextureSize/Math.max(w,h)),rw=Math.round(w*sc),rh=Math.round(h*sc);
+  const prevPR=renderer.getPixelRatio(),prev=renderer.getSize(new THREE.Vector2());
+  const T=makeTargets(rw,rh),N=S.dof?S.quality:(S.aa?Math.min(S.quality,16):1);
+  try{
+    for(let i=0;i<N;i++){
+      renderSample(T,i,w/h,S.aa||S.dof);
+      if(i%4===3){setStatus('رندر '+Math.round((i+1)/N*100)+'%');await new Promise(r=>setTimeout(r,0));}
+    }
+    renderer.setPixelRatio(1);renderer.setSize(rw,rh,false);present(T);
+    const out=document.createElement('canvas');out.width=w;out.height=h;
+    const ctx=out.getContext('2d');drawBg(ctx,w,h);ctx.imageSmoothingQuality='high';ctx.drawImage(renderer.domElement,0,0,w,h);
+    const blob=await new Promise(r=>out.toBlob(r,'image/png'));if(!blob)throw 0;
+    await saveBlob(blob,'any-angle-mockup-'+w+'x'+h+(S.bgOn?'':'-transparent')+'.png');
+    setStatus('خروجی گرفته شد');
+  }catch(e){setStatus('رندر نشد؛ ابعاد یا کیفیت کمتر رو امتحان کن');}
+  finally{
+    disposeTargets(T);renderer.setPixelRatio(prevPR);renderer.setSize(prev.x,prev.y,false);
+    btns.forEach(b=>b.disabled=false);exporting=false;busy=false;bump();
+  }
+}
+
+/* ---------- backgrounds ---------- */
+const BGS=[
+  {type:'solid',a:'#E4E6EA',label:'خاکستری روشن'},{type:'solid',a:'#FFFFFF',label:'سفید'},{type:'solid',a:'#111317',label:'مشکی'},
+  {type:'grad',a:'#EEF1F6',b:'#C5CFDF',label:'مه صبح'},{type:'grad',a:'#F1EAE0',b:'#D7C5AE',label:'شن'},
+  {type:'grad',a:'#E6F3EE',b:'#B4D9CB',label:'نعناع'},{type:'grad',a:'#2B303A',b:'#0F1216',label:'شب'}
+];
+const bgCSS=bg=>bg.type==='grad'?`linear-gradient(180deg,${bg.a},${bg.b})`:bg.a;
+function paintStage(){stage.classList.toggle('trans',!S.bgOn);stage.style.background=S.bgOn?bgCSS(S.bg):'';}
+function setBg(bg,btn){S.bg=bg;$$('#bgs .sw').forEach(b=>b.setAttribute('aria-pressed',b===btn));paintStage();}
+
+/* ---------- UI helpers ---------- */
+function chips(sel,items,onPick,isOn,cls){
+  const el=$(sel);el.innerHTML='';
+  items.forEach(it=>{const b=document.createElement('button');b.type='button';b.className='chip'+(cls?' '+cls:'');b.textContent=it.label;
+    b.setAttribute('aria-pressed',!!isOn(it));
+    b.addEventListener('click',()=>{$$(sel+' .chip').forEach(c=>c.setAttribute('aria-pressed','false'));b.setAttribute('aria-pressed','true');onPick(it);});
+    el.appendChild(b);});
+}
+const unpress=sel=>$$(sel+' .chip').forEach(c=>c.setAttribute('aria-pressed','false'));
+function slider(id,fmt,fn){const i=$('#'+id),o=$('#'+id+'Out');const u=()=>{o.textContent=fmt(+i.value);};i.addEventListener('input',()=>{u();fn(+i.value);});u();}
+function setVal(id,v,fmt){$('#'+id).value=v;$('#'+id+'Out').textContent=fmt(v);}
+function toggle(id,group,fn){const c=$('#'+id);const u=()=>{if(group)$('#'+group).classList.toggle('off',!c.checked);};c.addEventListener('change',()=>{u();fn(c.checked);});u();}
+const deg=v=>v+'°',pct=v=>v+'%';
+
+/* tabs + sheet */
+function openTab(id){
+  $$('.tab').forEach(t=>t.setAttribute('aria-selected',t.dataset.t===id));
+  $$('.pane').forEach(p=>p.hidden=p.id!=='p-'+id);
+  app.classList.add('sheet-open');
+}
+$$('.tab').forEach(t=>t.addEventListener('click',()=>{
+  if(sheetMQ.matches&&t.getAttribute('aria-selected')==='true'){app.classList.toggle('sheet-open');return;}
+  openTab(t.dataset.t);
+}));
+$('#handle').addEventListener('click',()=>app.classList.toggle('sheet-open'));
+
+/* image */
+chips('#shapes',[{label:'مطابق تصویر',v:'image'},{label:'آیفون',v:'iphone'},{label:'۱:۱',v:'square'},{label:'۳:۴',v:'34'},{label:'۴:۳',v:'43'},{label:'۹:۱۶',v:'916'},{label:'۱۶:۹',v:'169'}],
+  it=>{S.shape=it.v;syncFit();buildTexture();},it=>it.v==='image');
+function syncFit(){['fitCover','fitContain'].forEach(id=>$('#'+id).disabled=S.shape==='image');}
+['fitCover','fitContain'].forEach(id=>$('#'+id).addEventListener('click',()=>{
+  S.fit=id==='fitCover'?'cover':'contain';
+  $('#fitCover').setAttribute('aria-pressed',S.fit==='cover');$('#fitContain').setAttribute('aria-pressed',S.fit==='contain');buildTexture();}));
+slider('bright',v=>Math.round(v*100)+'%',v=>{S.bright=v;applyMat();});
+
+/* corners */
+toggle('cornersOn','cornerGroup',v=>{S.corners=v;buildTexture();});
+slider('radius',pct,v=>{S.radius=v;queueTexture();});
+slider('smooth',pct,v=>{S.smooth=v;queueTexture();});
+function setShape(r,s){S.radius=r;S.smooth=s;setVal('radius',r,pct);setVal('smooth',s,pct);buildTexture();}
+$('#iosPreset').addEventListener('click',()=>setShape(12,60));
+$('#roundPreset').addEventListener('click',()=>setShape(12,0));
+
+/* angle */
+const PRESETS=[
+  {label:'روبه‌رو',r:{x:0,y:0,z:0}},{label:'سه‌رخ',r:{x:-6,y:-28,z:3}},{label:'شناور',r:{x:12,y:26,z:-12}},
+  {label:'خوابیده',r:{x:-64,y:0,z:26}},{label:'از کنار',r:{x:0,y:-68,z:0}},{label:'پشت',r:{x:-4,y:160,z:0}}
+];
+function syncRot(){['x','y','z'].forEach(a=>setVal('r'+a,S.rot[a],deg));}
+chips('#presets',PRESETS,p=>{S.rot={...p.r};syncRot();resetCamera();bump();},p=>p.label==='سه‌رخ');
+['x','y','z'].forEach(a=>slider('r'+a,deg,v=>{S.rot[a]=v;unpress('#presets');bump();}));
+toggle('follow',null,v=>{S.follow=v;mouse.x=mouse.y=0;bump();});
+$('#resetCam').addEventListener('click',()=>{resetCamera();bump();});
+
+/* lens */
+slider('focal',v=>v+'mm',v=>{unpress('#lenses');setFocal(v,true);});
+chips('#lenses',[14,24,35,50,85,135,200].map(v=>({label:v+'mm',v})),it=>{setVal('focal',it.v,v=>v+'mm');setFocal(it.v,true);},it=>it.v===50,'num');
+toggle('dolly',null,v=>{S.dolly=v;});
+toggle('dofOn','dofGroup',v=>{S.dof=v;lensInfo();layout();});
+slider('fstop',v=>'f/'+v.toFixed(1),v=>{S.fstop=v;unpress('#fstops');lensInfo();bump();});
+chips('#fstops',[1.2,1.8,2.8,4,5.6,8,16].map(v=>({label:'f/'+v,v})),it=>{S.fstop=it.v;setVal('fstop',it.v,v=>'f/'+v.toFixed(1));lensInfo();bump();},it=>it.v===5.6,'num');
+slider('subject',v=>v+'cm',v=>{S.subject=v;bump();});
+const foffFmt=v=>(v>0?'+':'')+v.toFixed(1)+'cm';
+function setFoff(v){S.foff=v;setVal('foff',v,foffFmt);}
+slider('foff',foffFmt,v=>{S.foff=v;bump();});
+$('#focusCenter').addEventListener('click',()=>{S.focusLocal.set(0,0,0);setFoff(0);bump();});
+
+/* light */
+toggle('lightOn','lightGroup',v=>{S.light=v;applyMat();});
+slider('lightI',v=>v.toFixed(2),v=>{S.lightI=v;applyMat();});
+slider('lightAz',deg,v=>{S.lightAz=v;placeLight();bump();});
+slider('lightEl',deg,v=>{S.lightEl=v;placeLight();bump();});
+toggle('reflOn','reflGroup',v=>{S.refl=v;applyMat();});
+slider('reflI',v=>v.toFixed(2),v=>{S.reflI=v;applyMat();});
+slider('gloss',v=>v.toFixed(2),v=>{S.gloss=v;applyMat();});
+
+/* output */
+BGS.forEach((bg,i)=>{const b=document.createElement('button');b.type='button';b.className='sw';b.style.background=bgCSS(bg);
+  b.setAttribute('aria-label',bg.label);b.title=bg.label;b.addEventListener('click',()=>setBg(bg,b));$('#bgs').appendChild(b);if(i===0)setBg(bg,b);});
+const cp=document.createElement('input');cp.type='color';cp.className='colorpick';cp.value='#E4E6EA';cp.setAttribute('aria-label','رنگ دلخواه');
+cp.addEventListener('input',()=>setBg({type:'solid',a:cp.value},null));$('#bgs').appendChild(cp);
+toggle('bgOn','bgGroup',v=>{S.bgOn=v;paintStage();});
+chips('#aspects',[{label:'۱:۱',v:[1,1]},{label:'۴:۵',v:[4,5]},{label:'۹:۱۶',v:[9,16]},{label:'۱۶:۹',v:[16,9]},{label:'۳:۲',v:[3,2]}],it=>{S.aspect=it.v;layout();},it=>it.v[0]===4);
+chips('#sizes',[{label:'1080',v:1080},{label:'Full HD',v:1920},{label:'2K',v:2160},{label:'4K',v:3840}],it=>{S.long=it.v;layout();},it=>it.v===2160);
+chips('#quality',[{label:'سریع',v:48},{label:'خوب',v:128},{label:'عالی',v:256}],it=>{S.quality=it.v;layout();},it=>it.v===128);
+toggle('aaOn',null,v=>{S.aa=v;bump();});
+toggle('hqOn',null,v=>{S.hq=v;layout();});
+$('#render').addEventListener('click',doRender);
+$('#exportTop').addEventListener('click',doRender);
+
+/* files */
+const fileImg=$('#fileImg');
+$('#drop').addEventListener('click',()=>fileImg.click());
+$('#uploadTop').addEventListener('click',()=>fileImg.click());
+fileImg.addEventListener('change',()=>{if(fileImg.files[0])loadImageFile(fileImg.files[0]);fileImg.value='';});
+[$('#drop'),wrap].forEach(el=>{
+  el.addEventListener('dragover',e=>{e.preventDefault();$('#drop').classList.add('over');});
+  el.addEventListener('dragleave',()=>$('#drop').classList.remove('over'));
+  el.addEventListener('drop',e=>{e.preventDefault();$('#drop').classList.remove('over');loadImageFile([...e.dataTransfer.files].find(f=>f.type.startsWith('image/')));});
+});
+document.addEventListener('paste',e=>{const it=[...(e.clipboardData?.items||[])].find(i=>i.type.startsWith('image/'));if(it)loadImageFile(it.getAsFile());});
+
+/* ---------- start ---------- */
+if(sheetMQ.matches)app.classList.remove('sheet-open');
+syncFit();placeLight();applyMat();syncRot();
+root.rotation.set(S.rot.x*D2R,S.rot.y*D2R,S.rot.z*D2R);
+plane.scale.set(...planeSize(),1);
+lensInfo();layout();sampleImage();tick();
+})();
+</script>
+</body>
+</html>
