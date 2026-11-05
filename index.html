@@ -102,8 +102,10 @@ button{font:inherit;color:inherit}
   .bar .btn{padding:7px 12px;min-height:36px;font-size:13px}
   .stage-area{flex:1;padding:10px}
   .panel{order:2;border-left:0;border-top:1px solid var(--line);border-radius:16px 16px 0 0;box-shadow:0 -6px 24px rgba(0,0,0,.08)}
-  .handle{display:block;align-self:center;width:100%;height:20px;border:0;background:transparent;cursor:pointer;position:relative}
-  .handle::before{content:"";position:absolute;left:50%;top:8px;width:40px;height:4px;margin-left:-20px;border-radius:2px;background:var(--line)}
+  .handle{display:flex;align-items:center;justify-content:center;align-self:stretch;width:100%;height:44px;border:0;background:transparent;cursor:pointer;touch-action:none;color:var(--muted)}
+  .handle svg{width:32px;height:32px;transition:transform .25s ease}
+  .app.sheet-open .handle svg{transform:rotate(180deg)}
+  .handle:focus-visible{outline:2px solid var(--accent);outline-offset:-4px;border-radius:12px}
   .tabs{border-bottom:0;padding:0 8px 8px}
   .panes{flex:none;max-height:44dvh;border-top:1px solid var(--line)}
   .app:not(.sheet-open) .panes{display:none}
@@ -123,7 +125,7 @@ button{font:inherit;color:inherit}
   </header>
 
   <aside class="panel" aria-label="تنظیمات">
-    <button class="handle" id="handle" type="button" aria-label="باز و بسته کردن پنل"></button>
+    <button class="handle" id="handle" type="button" aria-label="باز و بسته کردن تنظیمات" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
     <nav class="tabs" role="tablist">
       <button class="tab" role="tab" data-t="img" aria-selected="true">تصویر</button>
       <button class="tab" role="tab" data-t="shape" aria-selected="false">گوشه‌ها</button>
@@ -564,16 +566,23 @@ function toggle(id,group,fn){const c=$('#'+id);const u=()=>{if(group)$('#'+group
 const deg=v=>v+'°',pct=v=>v+'%';
 
 /* tabs + sheet */
+const handle=$('#handle');
+function setSheet(open){app.classList.toggle('sheet-open',open);handle.setAttribute('aria-expanded',open);}
 function openTab(id){
   $$('.tab').forEach(t=>t.setAttribute('aria-selected',t.dataset.t===id));
   $$('.pane').forEach(p=>p.hidden=p.id!=='p-'+id);
-  app.classList.add('sheet-open');
+  setSheet(true);
 }
 $$('.tab').forEach(t=>t.addEventListener('click',()=>{
-  if(sheetMQ.matches&&t.getAttribute('aria-selected')==='true'){app.classList.toggle('sheet-open');return;}
+  if(sheetMQ.matches&&t.getAttribute('aria-selected')==='true'){setSheet(!app.classList.contains('sheet-open'));return;}
   openTab(t.dataset.t);
 }));
-$('#handle').addEventListener('click',()=>app.classList.toggle('sheet-open'));
+// tap toggles; swipe up opens, swipe down closes
+let hY=null,swiped=false;
+handle.addEventListener('pointerdown',e=>{hY=e.clientY;swiped=false;});
+handle.addEventListener('pointerup',e=>{if(hY===null)return;const dy=e.clientY-hY;hY=null;if(Math.abs(dy)>24){swiped=true;setSheet(dy<0);}});
+handle.addEventListener('pointercancel',()=>{hY=null;});
+handle.addEventListener('click',()=>{if(swiped){swiped=false;return;}setSheet(!app.classList.contains('sheet-open'));});
 
 /* image */
 chips('#shapes',[{label:'مطابق تصویر',v:'image'},{label:'آیفون',v:'iphone'},{label:'۱:۱',v:'square'},{label:'۳:۴',v:'34'},{label:'۴:۳',v:'43'},{label:'۹:۱۶',v:'916'},{label:'۱۶:۹',v:'169'}],
@@ -652,7 +661,7 @@ fileImg.addEventListener('change',()=>{if(fileImg.files[0])loadImageFile(fileImg
 document.addEventListener('paste',e=>{const it=[...(e.clipboardData?.items||[])].find(i=>i.type.startsWith('image/'));if(it)loadImageFile(it.getAsFile());});
 
 /* ---------- start ---------- */
-if(sheetMQ.matches)app.classList.remove('sheet-open');
+setSheet(!sheetMQ.matches);
 syncFit();placeLight();applyMat();syncRot();
 root.rotation.set(S.rot.x*D2R,S.rot.y*D2R,S.rot.z*D2R);
 plane.scale.set(...planeSize(),1);
