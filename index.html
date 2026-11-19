@@ -162,6 +162,7 @@ body.exporting .panel,body.exporting .timeline,body.exporting .bar .acts{pointer
   <header class="bar">
     <h1>Any Angle Mockup</h1>
     <div class="acts">
+      <button class="btn ghost" id="updateBtn" type="button" hidden>نسخه‌ی جدید</button>
       <button class="btn ghost" id="uploadTop" type="button">آپلود تصویر</button>
       <button class="btn" id="exportTop" type="button">خروجی PNG</button>
     </div>
@@ -885,7 +886,17 @@ function bgPaint(ctx,w,h,bg=S.bg){
   }else ctx.fillStyle=bg.a;
   ctx.fillRect(0,0,w,h);
 }
+const TAURI=window.__TAURI__&&window.__TAURI__.core?window.__TAURI__:null;
+const encPath=p=>encodeURIComponent(p);
 async function saveBlob(blob,name){
+  if(TAURI){
+    const ext=name.split('.').pop().toLowerCase();
+    const path=await TAURI.core.invoke('plugin:dialog|save',{options:{defaultPath:name,filters:[{name:ext.toUpperCase(),extensions:[ext]}],canCreateDirectories:true}});
+    if(!path)return false;
+    const bytes=new Uint8Array(await blob.arrayBuffer());
+    await TAURI.core.invoke('save_file',bytes,{headers:{'x-path':encPath(path)}});
+    return true;
+  }
   try{if(window.claude&&typeof claude.use==='function'){const d=await claude.use('downloads');if(d){await d.save({filename:name,data:blob});return;}}}catch(e){if(e&&e.code==='declined')return;}
   const url=URL.createObjectURL(blob),a=document.createElement('a');
   a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
@@ -936,8 +947,8 @@ async function exportImage(){
     const ctx=out.getContext('2d');if(useBg)bgPaint(ctx,w,h);ctx.imageSmoothingQuality='high';ctx.drawImage(renderer.domElement,0,0,w,h);
     const type={png:'image/png',webp:'image/webp',jpg:'image/jpeg'}[fmt];
     const blob=await new Promise(r=>out.toBlob(r,type,fmt==='png'?undefined:S.imgQ/100));if(!blob)throw 0;
-    await saveBlob(blob,'any-angle-mockup-'+w+'x'+h+(useBg?'':'-transparent')+'.'+fmt);
-    setStatus('خروجی گرفته شد · '+fmtSize(blob.size),6000);
+    if(await saveBlob(blob,'any-angle-mockup-'+w+'x'+h+(useBg?'':'-transparent')+'.'+fmt)===false)setStatus('ذخیره لغو شد',4000);
+    else setStatus('خروجی گرفته شد · '+fmtSize(blob.size),6000);
   }catch(e){setStatus(e==='cancel'?'لغو شد':'رندر نشد؛ ابعاد یا کیفیت کمتر رو امتحان کن');}
   finally{endExport(null);}
 }
@@ -1014,8 +1025,8 @@ async function exportVideo(){
     busyProg(1,'در حال نهایی کردن فایل…');
     await encoder.flush();if(err)throw err;muxer.finalize();
     const blob=new Blob([target.buffer],{type:C.mime});
-    await saveBlob(blob,'any-angle-mockup-'+w+'x'+h+'-'+fps+'fps.'+C.ext);
-    setStatus('ویدیو آماده شد · '+fmtSize(blob.size),6000);
+    if(await saveBlob(blob,'any-angle-mockup-'+w+'x'+h+'-'+fps+'fps.'+C.ext)===false)setStatus('ذخیره لغو شد',4000);
+    else setStatus('ویدیو آماده شد · '+fmtSize(blob.size),6000);
   }catch(e){setStatus(e==='cancel'?'لغو شد':'ساخت ویدیو ناموفق بود؛ ابعاد یا کیفیت کمتر رو امتحان کن');console.error(e);}
   finally{try{encoder&&encoder.state!=='closed'&&encoder.close();}catch(e){}endExport(saved);}
 }
@@ -1116,8 +1127,8 @@ async function exportGif(){
     }
     gif.finish();
     const blob=new Blob([gif.bytes()],{type:'image/gif'});
-    await saveBlob(blob,'any-angle-mockup-'+w+'x'+h+'-'+fps+'fps.gif');
-    setStatus('GIF آماده شد · '+fmtSize(blob.size),6000);
+    if(await saveBlob(blob,'any-angle-mockup-'+w+'x'+h+'-'+fps+'fps.gif')===false)setStatus('ذخیره لغو شد',4000);
+    else setStatus('GIF آماده شد · '+fmtSize(blob.size),6000);
   }catch(e){setStatus(e==='cancel'?'لغو شد':'ساخت GIF ناموفق بود؛ ابعاد یا فریم کمتر رو امتحان کن');console.error(e);}
   finally{endExport(saved);}
 }
@@ -1304,8 +1315,19 @@ $('#renderGif').addEventListener('click',exportGif);
 
 /* files */
 const fileImg=$('#fileImg');
-$('#drop').addEventListener('click',()=>fileImg.click());
-$('#uploadTop').addEventListener('click',()=>fileImg.click());
+const MIME={png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',webp:'image/webp',gif:'image/gif',bmp:'image/bmp',avif:'image/avif'};
+async function pickImage(){
+  if(!TAURI){fileImg.click();return;}
+  try{
+    const path=await TAURI.core.invoke('plugin:dialog|open',{options:{multiple:false,directory:false,filters:[{name:'Images',extensions:Object.keys(MIME)}]}});
+    if(!path)return;
+    const buf=await TAURI.core.invoke('read_file',{},{headers:{'x-path':encPath(path)}});
+    const name=path.split(/[\\/]/).pop(),ext=name.split('.').pop().toLowerCase();
+    loadImageFile(new File([buf],name,{type:MIME[ext]||'image/png'}));
+  }catch(e){setStatus('این فایل باز نشد',4000);console.error(e);}
+}
+$('#drop').addEventListener('click',pickImage);
+$('#uploadTop').addEventListener('click',pickImage);
 fileImg.addEventListener('change',()=>{if(fileImg.files[0])loadImageFile(fileImg.files[0]);fileImg.value='';});
 [$('#drop'),wrap].forEach(el=>{
   el.addEventListener('dragover',e=>{e.preventDefault();$('#drop').classList.add('over');});
@@ -1313,6 +1335,33 @@ fileImg.addEventListener('change',()=>{if(fileImg.files[0])loadImageFile(fileImg
   el.addEventListener('drop',e=>{e.preventDefault();$('#drop').classList.remove('over');loadImageFile([...e.dataTransfer.files].find(f=>f.type.startsWith('image/')));});
 });
 document.addEventListener('paste',e=>{const it=[...(e.clipboardData?.items||[])].find(i=>i.type.startsWith('image/'));if(it)loadImageFile(it.getAsFile());});
+
+/* ---------- desktop app ---------- */
+const REPO='Usertherapist/any-angle-mockup';
+async function checkUpdates(manual){
+  if(!TAURI)return;
+  try{
+    const cur=await TAURI.core.invoke('plugin:app|version');
+    const r=await fetch('https://api.github.com/repos/'+REPO+'/releases/latest',{headers:{Accept:'application/vnd.github+json'}});
+    if(!r.ok)throw new Error(r.status);
+    const rel=await r.json(),latest=String(rel.tag_name||'').replace(/^v/,'');
+    const num=v=>v.split('.').map(x=>parseInt(x,10)||0),a=num(latest),b=num(cur);
+    let newer=false;for(let i=0;i<3;i++){if((a[i]||0)!==(b[i]||0)){newer=(a[i]||0)>(b[i]||0);break;}}
+    const btn=$('#updateBtn');
+    if(newer){btn.hidden=false;btn.textContent='نسخه‌ی جدید '+latest;btn.onclick=()=>TAURI.core.invoke('plugin:opener|open_url',{url:rel.html_url});if(manual)setStatus('نسخه‌ی '+latest+' آماده‌ست؛ دکمه‌ی بالا رو بزن',6000);}
+    else if(manual)setStatus('آخرین نسخه رو داری ('+cur+')',5000);
+  }catch(e){if(manual)setStatus('بررسی نسخه‌ی جدید انجام نشد؛ اینترنت رو چک کن',5000);}
+}
+if(TAURI){
+  document.documentElement.classList.add('desktop');
+  TAURI.event.listen('menu',e=>{
+    if(exporting)return;
+    if(e.payload==='open')pickImage();
+    else if(e.payload==='export')runExport();
+    else if(e.payload==='updates')checkUpdates(true);
+  });
+  setTimeout(()=>checkUpdates(false),4000);
+}
 
 /* ---------- start ---------- */
 setSheet(!sheetMQ.matches);

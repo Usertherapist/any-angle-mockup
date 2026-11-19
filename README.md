@@ -35,3 +35,21 @@ Vercel: import the repo as a static project (Framework: Other, no build command)
 ## Third-party
 
 three.js (MIT), mp4-muxer and webm-muxer (MIT), gifenc (MIT), Vazirmatn and IBM Plex Mono fonts (OFL).
+
+## macOS app
+
+`desktop/` wraps the same web app in a native macOS shell (Tauri): native open/save dialogs, File menu (⌘O open, ⌘E export), and an update check.
+
+Every push to `main` builds a universal DMG (Apple Silicon + Intel) on GitHub Actions and publishes it under **Releases**. The version is `1.0.<build number>`. The app checks the latest release on launch (and from *Check for Updates…* in the app menu) and shows a button when a newer version exists.
+
+The app is not signed with an Apple Developer ID. On first launch, right-click the app and choose **Open**, or allow it in **System Settings → Privacy & Security**. If macOS says the app is damaged, run:
+
+```
+xattr -cr "/Applications/Any Angle Mockup.app"
+```
+
+Build locally on a Mac:
+
+```
+cd desktop && npm install && npx tauri build
+```
